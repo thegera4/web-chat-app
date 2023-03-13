@@ -1,34 +1,85 @@
+import { useState } from "react";
 import styled from "styled-components";
-import AccountCircleIcon from '@mui/icons-material/AccountCircle';
+import Avatar from '@mui/material/Avatar';
 import ChatIcon from '@mui/icons-material/Chat';
 import MoreVertIcon from '@mui/icons-material/MoreVert';
 import SearchIcon from '@mui/icons-material/Search';
-import { Button, IconButton } from "@mui/material";
+import { Button, IconButton, TextField, Dialog, DialogActions, 
+  DialogContent, DialogContentText, DialogTitle } from "@mui/material";
 import * as EmailValidator from 'email-validator';
 import { signOut } from "firebase/auth"
-import { auth } from '../firebase'
+import { useAuthState } from "react-firebase-hooks/auth";
+import { useCollection } from "react-firebase-hooks/firestore";
+import { auth, db } from '../firebase'
+import { collection, query, where, getDocs, addDoc, 
+  setDoc, doc, Timestamp } from "firebase/firestore"
+import Chat from "./Chat";
 
 function Sidebar() {
+  const [user] = useAuthState(auth);
+  const userChatRef = query(
+    collection(db, "chats"), 
+    where("users", "array-contains", user.email)
+  );
+  const [chatsSnapshot] = useCollection(userChatRef);
+  const [open, setOpen] = useState(false);
+  const [email, setEmail] = useState("");
+  const [emailEmpty, setEmailEmpty] = useState(false);
+  const [emailError, setEmailError] = useState(false);
+  const [emailExists, setEmailExists] = useState(false);
+
+  const handleClickOpen = () => setOpen(true);
+
+  const handleClose = () =>{
+    setEmail("");
+    setEmailEmpty(false);
+    setEmailError(false);
+    setEmailExists(false);
+    setOpen(false);
+  }
 
   const createChat = () => {
-    const input = prompt(
-      "Please enter an email address for the user you wish to chat with"
-    );
-
-    if (!input) return null;
-
-    if (EmailValidator.validate(input)) {
-      // We need to add the chat into the DB 'chats' collection 
-      
+    if (!email) {
+      setEmailEmpty(true);
+      return;
+    } else {
+      setEmailEmpty(false);
     }
-
-
+    if(!EmailValidator.validate(email)) {
+      setEmailError(true);
+      return;
+    } else {
+      setEmailError(false);
+    }
+    if (chatAlreadyExists(email)) {
+      setEmailExists(true);
+      return;
+    } else {
+      setEmailExists(false);
+    }
+    const input = email.trim();
+    if (!input) return null;
+    if (EmailValidator.validate(input) && !chatAlreadyExists(input)
+    && input !== user.email) {
+      addDoc(collection(db, "chats"), {
+        users: [user.email, input],
+      });
+    }
   }
+
+  const chatAlreadyExists = (recipientEmail) => {
+    return !!chatsSnapshot?.docs.find((chat) =>
+      chat.data().users.find((user) => user === recipientEmail)?.length > 0
+  )};
 
   return (
     <Container>
       <Header>
-        <UserAvatar onClick={()=>signOut(auth)}/>
+      {user.photoURL?
+        <Avatar src={user.photoURL} onClick={()=>signOut(auth)}/>
+        :
+        <Avatar onClick={()=>signOut(auth)}>{user.email[0]}</Avatar>
+      }
         <IconsContainer>
           <IconButton>
             <ChatIcon style={{color: "black"}} />
@@ -42,9 +93,40 @@ function Sidebar() {
         <SearchIcon />
         <SearchInput placeholder="Search in messages"/>
       </Search>
-      <SidebarButton
-        onClick={() => createChat()}
-      >Start a new conversation</SidebarButton>
+      <SidebarButton variant="text" onClick={handleClickOpen} >
+        Start a new conversation
+      </SidebarButton>
+      <Dialog open={open} onClose={handleClose}>
+        <DialogTitle>Create a new chat</DialogTitle>
+        <DialogContent>
+          <DialogContentText>
+          Please enter the email address of the person you wish to chat with:
+          </DialogContentText>
+          <TextField
+            autoFocus
+            margin="dense"
+            id="email"
+            label="Email Address"
+            type="email"
+            fullWidth
+            variant="standard"
+            error={emailEmpty || emailError || emailExists}
+            helperText={ 
+              emailEmpty ? "Please enter an email address" : 
+              emailError ? "Please enter a valid email address" :
+              emailExists ? "This email address is already in your chat list" : ""
+            }
+            onChange={(e) => setEmail(e.target.value)}
+          />
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={handleClose}>Cancel</Button>
+          <Button onClick={() => createChat()}>Create</Button>
+        </DialogActions>
+      </Dialog>
+      {chatsSnapshot?.docs.map((chat) => (
+        <Chat key={chat.id} id={chat.id} users={chat.data().users} />
+      ))}
       
     </Container>
   )
@@ -53,7 +135,18 @@ function Sidebar() {
 export default Sidebar
 
 const Container = styled.div`
+  flex: 0.45;
+  border-right: 1px solid whitesmoke;
+  height: 100vh;
+  min-width: 300px;
+  max-width: 350px;
+  overflow-y: scroll;
 
+  ::-webkit-scrollbar {
+    display: none;
+  }
+  -ms-overflow-style: none; // IE and Edge
+  scrollbar-width: none; // Firefox
 `;
 
 const Header = styled.div`
@@ -69,7 +162,7 @@ const Header = styled.div`
   border-bottom: 1px solid whitesmoke;
 `;
 
-const UserAvatar = styled(AccountCircleIcon)`
+const UserAvatar = styled(Avatar)`
   color: black;
   cursor: pointer;
   :hover {
@@ -97,8 +190,8 @@ const SearchInput = styled.input`
 const SidebarButton = styled(Button)`
   width: 100%;
   &&& {
-    border-top: 1px solid whitesmoke;
-    border-bottom: 1px solid whitesmoke;
+    //border-top: 1px solid whitesmoke;
+    //border-bottom: 1px solid whitesmoke;
   }
 `;
 

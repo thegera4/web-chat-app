@@ -1,15 +1,11 @@
-import '@/styles/globals.css'
+import { useEffect } from 'react'
 import { useAuthState } from 'react-firebase-hooks/auth'
 import { auth, db } from '../firebase'
 import { collection, getDocs, addDoc, 
   setDoc, doc, Timestamp } from "firebase/firestore"
 import Login from './login'
 import Loading from '../components/Loading'
-import { useEffect } from 'react'
-
-import { initializeApp } from "firebase/app";
-import { getFirestore } from "firebase/firestore";
-import { getAuth, GoogleAuthProvider } from "firebase/auth";
+import '@/styles/globals.css'
 
 export default function App({ Component, pageProps }) {
   const [user, loading, error] = useAuthState(auth)
@@ -31,8 +27,6 @@ export default function App({ Component, pageProps }) {
 
   //if(loading) return <Loading/> 
   if(!user) return <Login />
-
-  console.log('user', user)
 
   return <Component {...pageProps} />
 }

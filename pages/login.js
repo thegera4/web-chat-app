@@ -1,3 +1,4 @@
+import { useEffect } from "react"
 import { Button } from "@mui/material"
 import { signInWithPopup } from "firebase/auth"
 import Head from "next/head"
