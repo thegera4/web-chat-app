@@ -65,6 +65,7 @@ function Sidebar() {
         users: [user.email, input],
       });
     }
+    setOpen(false);
   }
 
   const chatAlreadyExists = (recipientEmail) => {
